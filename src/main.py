@@ -1,3 +1,14 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Telegram Stories Automator - Основной скрипт запуска
+
+Автоматизация публикации сторис в Telegram с проверкой номеров и упоминаниями пользователей.
+
+Автор: Сергей Дышкант (SergD)
+Контакт: https://t.me/sergei_dyshkant
+"""
+
 import os
 import sys
 import logging
