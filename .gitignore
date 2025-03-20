@@ -1,0 +1,36 @@
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE specific files
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# Telegram session files
+*.session
+*.session-journal
+
+# Local configuration
+.env
+
+# Logs and data files
+*.log
+/data/results/
+/data/sessions/
+
+# Don't ignore sample files and directories
+!/data/contacts/contacts_example.csv
+!/data/stories/.gitkeep

@@ -1,0 +1,5 @@
+telethon
+python-dotenv
+tqdm
+pandas
+colorama
