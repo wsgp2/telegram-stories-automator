@@ -107,3 +107,87 @@ class ContactChecker:
     def get_found_users(self):
         """Возвращает найденных пользователей"""
         return self.found_users
+    
+    async def get_user_by_username(self, username):
+        """
+        Получение сущности пользователя по юзернейму
+        
+        Args:
+            username (str): Юзернейм пользователя (без символа @)
+            
+        Returns:
+            Entity или None: Сущность пользователя или None, если пользователь не найден
+        """
+        try:
+            # Добавляем @ если его нет в начале
+            if not username.startswith('@'):
+                username = '@' + username
+                
+            entity = await self.client.get_entity(username)
+            logger.info(f"Найден пользователь {username}: {entity.id}")
+            return entity
+        except Exception as e:
+            logger.error(f"Ошибка при поиске пользователя {username}: {e}")
+            return None
+    
+    async def check_usernames_from_file(self, filepath):
+        """
+        Проверка существования пользователей по юзернейму из файла
+        
+        Args:
+            filepath (str): Путь к CSV-файлу с юзернеймами
+            
+        Returns:
+            list: Список найденных пользователей
+        """
+        if not os.path.exists(filepath):
+            logger.error(f"Файл {filepath} не найден")
+            return []
+        
+        try:
+            # Чтение юзернеймов из файла
+            usernames = []
+            with open(filepath, 'r', encoding='utf-8') as file:
+                reader = csv.DictReader(file)
+                for row in reader:
+                    if 'username' in row:
+                        usernames.append(row['username'])
+            
+            if not usernames:
+                logger.warning(f"В файле {filepath} не найдены юзернеймы")
+                return []
+            
+            logger.info(f"Загружено {len(usernames)} юзернеймов для проверки")
+            
+            # Проверка юзернеймов и получение пользователей
+            found_users = []
+            for username in tqdm(usernames, desc="Проверка юзернеймов", unit="user"):
+                entity = await self.get_user_by_username(username)
+                if entity:
+                    found_users.append({
+                        'user_id': entity.id,
+                        'username': username,
+                        'first_name': getattr(entity, 'first_name', ''),
+                        'last_name': getattr(entity, 'last_name', '')
+                    })
+                # Небольшая задержка, чтобы не перегружать API
+                await asyncio.sleep(1)
+            
+            logger.info(f"Найдено {len(found_users)} пользователей из {len(usernames)}")
+            
+            # Сохраняем результаты в CSV
+            if found_users:
+                output_dir = os.path.join(os.path.dirname(filepath), 'results')
+                os.makedirs(output_dir, exist_ok=True)
+                
+                output_file = os.path.join(output_dir, 'found_users.csv')
+                df = pd.DataFrame(found_users)
+                df.to_csv(output_file, index=False, encoding='utf-8')
+                
+                logger.info(f"Результаты сохранены в {output_file}")
+            
+            return found_users
+            
+        except Exception as e:
+            logger.error(f"Ошибка при проверке юзернеймов из файла {filepath}: {e}")
+            return []

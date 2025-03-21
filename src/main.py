@@ -12,17 +12,18 @@ Telegram Stories Automator - Основной скрипт запуска
 import os
 import sys
 import logging
-import asyncio
 import json
+import asyncio
+import random
 from pathlib import Path
 
-# Добавляем родительскую директорию в путь для импорта
-sys.path.append(str(Path(__file__).parent.parent))
+# Добавляем корневую директорию проекта в PATH
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from utils.account_manager import AccountManager
-from utils.contact_checker import ContactChecker
-from utils.story_publisher import StoryPublisher
-from configs.settings import CONTACTS_DIR, RESULTS_DIR, DEFAULT_CONTACTS_FILE, STORIES_DIR
+from src.utils.account_manager import AccountManager
+from src.utils.contact_checker import ContactChecker
+from src.utils.story_publisher import StoryPublisher
+from configs.settings import CONTACTS_DIR, STORIES_DIR, RESULTS_DIR, PROJECT_DIR, DELAY_BETWEEN_STORIES
 
 # Настройка логирования
 logging.basicConfig(
@@ -30,71 +31,147 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler(os.path.join(RESULTS_DIR, 'app.log'))
+        logging.FileHandler(os.path.join(PROJECT_DIR, 'telegram_stories.log'))
     ]
 )
-
 logger = logging.getLogger(__name__)
 
 async def main():
-    logger.info("Запуск приложения Telegram Stories Automator")
-    
-    # Проверка наличия необходимых директорий и файлов
-    if not os.path.exists(STORIES_DIR) or not any(os.scandir(STORIES_DIR)):
-        logger.error(f"Директория {STORIES_DIR} не существует или пуста. Добавьте видео файлы для сторис.")
-        return
-    
-    # Инициализация менеджера аккаунтов
-    account_manager = AccountManager()
-    clients = await account_manager.setup_clients()
-    
-    if not clients:
-        logger.error("Не удалось настроить ни один клиент Telegram. Проверьте конфигурацию аккаунтов.")
-        return
-    
-    logger.info(f"Успешно настроено {len(clients)} клиентов Telegram")
-    
+    """Основная функция запуска приложения"""
     try:
-        # Запрос пути к файлу с контактами или использование стандартного
-        contacts_file = input(f"Введите путь к файлу контактов (или нажмите Enter для использования {DEFAULT_CONTACTS_FILE}): ")
-        if not contacts_file:
-            contacts_file = DEFAULT_CONTACTS_FILE
+        logger.info("Запуск Telegram Stories Automator")
         
-        if not os.path.exists(contacts_file):
-            logger.error(f"Файл контактов {contacts_file} не найден.")
+        # Проверяем наличие необходимых директорий
+        os.makedirs(CONTACTS_DIR, exist_ok=True)
+        os.makedirs(STORIES_DIR, exist_ok=True)
+        os.makedirs(RESULTS_DIR, exist_ok=True)
+        
+        # Получаем список аккаунтов
+        account_manager = AccountManager()
+        clients = await account_manager.load_accounts()
+        
+        if not clients:
+            logger.error("Не удалось загрузить ни одного аккаунта")
             return
         
-        # Создание объекта проверки контактов
-        client = account_manager.get_client(0)  # Используем первый клиент для проверки
-        contact_checker = ContactChecker(client)
+        logger.info(f"Загружено {len(clients)} аккаунтов")
         
-        # Обработка файла контактов
-        output_file = os.path.join(RESULTS_DIR, 'telegram_users.csv')
-        users = await contact_checker.process_contacts_file(contacts_file, output_file)
+        # Проверяем существование контактов и получаем список найденных
+        mode = input("Выберите режим проверки (1 - по номеру телефона, 2 - по юзернейму): ")
         
-        if not users:
-            logger.warning("Не найдено пользователей Telegram среди контактов.")
+        found_users = []
+        
+        if mode == "1":
+            # Проверка по номеру телефона
+            contacts_file = input(f"Введите путь к файлу с номерами (или нажмите Enter для 'contacts_example.csv'): ")
+            if not contacts_file:
+                contacts_file = os.path.join(CONTACTS_DIR, 'contacts_example.csv')
+            
+            contacts_file = os.path.join(CONTACTS_DIR, contacts_file) if not os.path.isabs(contacts_file) else contacts_file
+            
+            logger.info(f"Проверка контактов из файла {contacts_file}")
+            
+            for i, client in enumerate(clients):
+                checker = ContactChecker(client)
+                user_contacts = await checker.check_contacts_from_file(contacts_file)
+                found_users.extend(user_contacts)
+                
+                if i < len(clients) - 1:
+                    # Задержка между аккаунтами, чтобы не перегружать API
+                    logger.info(f"Ожидание перед проверкой с нового аккаунта...")
+                    await asyncio.sleep(DELAY_BETWEEN_STORIES)
+        
+        elif mode == "2":
+            # Проверка по юзернейму
+            usernames_file = input(f"Введите путь к файлу с юзернеймами (или нажмите Enter для 'contacts_test.csv'): ")
+            if not usernames_file:
+                usernames_file = os.path.join(CONTACTS_DIR, 'contacts_test.csv')
+            
+            usernames_file = os.path.join(CONTACTS_DIR, usernames_file) if not os.path.isabs(usernames_file) else usernames_file
+            
+            logger.info(f"Проверка юзернеймов из файла {usernames_file}")
+            
+            for i, client in enumerate(clients):
+                checker = ContactChecker(client)
+                username_users = await checker.check_usernames_from_file(usernames_file)
+                found_users.extend(username_users)
+                
+                if i < len(clients) - 1:
+                    # Задержка между аккаунтами, чтобы не перегружать API
+                    logger.info(f"Ожидание перед проверкой с нового аккаунта...")
+                    await asyncio.sleep(DELAY_BETWEEN_STORIES)
+        
+        else:
+            logger.error("Неверный режим проверки")
             return
         
-        logger.info(f"Найдено {len(users)} пользователей Telegram среди контактов")
+        if not found_users:
+            logger.warning("Не найдено ни одного пользователя для упоминания")
+            return
         
-        # Создание объекта публикации сторис
-        publisher = StoryPublisher(client)
+        logger.info(f"Найдено {len(found_users)} пользователей для упоминания")
         
         # Публикация сторис с упоминаниями
-        success_count = await publisher.batch_publish_stories(users)
-        logger.info(f"Успешно опубликовано {success_count} сторис с упоминаниями")
+        should_publish = input("Опубликовать сторис с упоминаниями? (y/n): ")
+        if should_publish.lower() != 'y':
+            logger.info("Публикация отменена пользователем")
+            return
         
-        # Очистка контактов
-        await contact_checker.cleanup_contacts()
+        # Проверяем наличие файлов сторис
+        story_files = [f for f in os.listdir(STORIES_DIR) 
+                      if os.path.isfile(os.path.join(STORIES_DIR, f)) 
+                      and f.lower().endswith(('.mp4', '.avi', '.mov', '.jpg', '.jpeg', '.png'))]
         
+        if not story_files:
+            logger.error(f"В директории {STORIES_DIR} не найдены файлы для сторис")
+            return
+        
+        logger.info(f"Найдено {len(story_files)} файлов для сторис")
+        
+        # Публикуем сторис по очереди с разных аккаунтов
+        total_published = 0
+        users_per_story = min(10, len(found_users))  # Максимум 10 упоминаний на одну сторис
+        
+        # Разбиваем пользователей на группы
+        user_groups = [found_users[i:i+users_per_story] for i in range(0, len(found_users), users_per_story)]
+        
+        for i, client in enumerate(clients):
+            publisher = StoryPublisher(client)
+            
+            # Получаем группы для текущего аккаунта
+            account_groups = user_groups[i::len(clients)]
+            if not account_groups:
+                continue
+            
+            logger.info(f"Публикация сторис с аккаунта {i+1} с {len(account_groups)} группами упоминаний")
+            
+            for group in account_groups:
+                # Выбираем случайный файл сторис
+                story_file = os.path.join(STORIES_DIR, random.choice(story_files))
+                
+                # Публикуем сторис
+                result = await publisher.publish_story_with_mentions(group, story_file)
+                
+                if result:
+                    total_published += 1
+                    logger.info(f"Опубликована сторис {total_published}/{len(account_groups)}")
+                else:
+                    logger.warning(f"Не удалось опубликовать сторис с аккаунта {i+1}")
+                
+                # Задержка между публикациями
+                await asyncio.sleep(DELAY_BETWEEN_STORIES)
+        
+        logger.info(f"Всего опубликовано {total_published} сторис")
+        
+    except KeyboardInterrupt:
+        logger.info("Работа программы прервана пользователем")
     except Exception as e:
-        logger.error(f"Произошла ошибка при выполнении приложения: {e}")
+        logger.error(f"Ошибка при выполнении программы: {e}")
     finally:
-        # Закрытие клиентов
-        await account_manager.close_all_clients()
-        logger.info("Работа приложения завершена")
+        # Закрываем все клиенты
+        for client in clients:
+            await client.disconnect()
+        logger.info("Программа завершена")
 
 if __name__ == "__main__":
-    # Запуск асинхронной функции main
     asyncio.run(main())

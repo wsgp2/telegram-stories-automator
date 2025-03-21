@@ -86,7 +86,7 @@ class StoryPublisher:
                     mentioned_users.append(user)
             
             # Формируем caption с упоминаниями
-            caption = "Отмечаю моих друзей в Telegram! "
+            caption = "Тестирую авто упоминание в сторис! Если интересно то напиши свой ник телеграм в коментарий под постом https://t.me/c/2229955923/339 "
             entities = []
             
             offset = len(caption)
