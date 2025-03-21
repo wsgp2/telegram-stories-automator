@@ -5,10 +5,10 @@
       "api_hash": "YOUR_API_HASH_1",
       "phone": "YOUR_PHONE_1",
       "proxy": {
-        "server": "proxy_server_1",
-        "port": "proxy_port_1",
-        "username": "proxy_username_1",
-        "password": "proxy_password_1"
+        "server": "YOUR_PROXY_SERVER_1",
+        "port": "YOUR_PROXY_PORT_1",
+        "username": "YOUR_PROXY_USERNAME_1",
+        "password": "YOUR_PROXY_PASSWORD_1"
       }
     },
     {
