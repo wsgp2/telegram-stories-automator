@@ -2,11 +2,13 @@ import logging
 import csv
 import pandas as pd
 import os
+import json
 from telethon.tl.functions.contacts import ImportContactsRequest
 from telethon.tl.types import InputPhoneContact
 import asyncio
 import time
 from tqdm import tqdm
+from configs.settings import RESULTS_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +23,32 @@ class ContactChecker:
             # Иначе предполагаем, что передан сам объект клиента
             self.client = client_data
         self.found_users = {}
+        self.cache_file = os.path.join(RESULTS_DIR, 'users_cache.json')
+        self.cached_users = self._load_cache()
+    
+    def _load_cache(self):
+        """Загрузка кэша проверенных пользователей"""
+        if os.path.exists(self.cache_file):
+            try:
+                with open(self.cache_file, 'r', encoding='utf-8') as f:
+                    cache = json.load(f)
+                logger.info(f"Загружено {len(cache)} пользователей из кэша")
+                return cache
+            except Exception as e:
+                logger.error(f"Ошибка при загрузке кэша: {e}")
+        return {}
+    
+    def _save_cache(self):
+        """Сохранение кэша проверенных пользователей"""
+        try:
+            # Объединяем новых найденных пользователей с кэшем
+            merged_cache = {**self.cached_users, **self.found_users}
+            
+            with open(self.cache_file, 'w', encoding='utf-8') as f:
+                json.dump(merged_cache, f, ensure_ascii=False, indent=2)
+            logger.info(f"Сохранено {len(merged_cache)} пользователей в кэш")
+        except Exception as e:
+            logger.error(f"Ошибка при сохранении кэша: {e}")
     
     async def check_phone_number(self, phone_number):
         """Проверяет наличие пользователя в Telegram по номеру телефона"""
@@ -176,15 +204,35 @@ class ContactChecker:
                 logger.error(f"В файле {filepath} отсутствует колонка 'username'")
                 return []
                 
-            logger.info(f"Загружено {len(df)} юзернеймов для проверки")
+            # Предварительно отфильтровываем пользователей, которые уже есть в кэше
+            new_usernames = []
+            cached_found = []
             
-            # Создаём tqdm прогресс-бар для отслеживания прогресса
-            from tqdm import tqdm
-            for _, row in tqdm(df.iterrows(), total=len(df), desc="Проверка юзернеймов"):
+            for _, row in df.iterrows():
                 username = row['username'].strip()
                 if not username:
                     continue
-                    
+                
+                # Проверяем, есть ли пользователь в кэше
+                cache_key = username.lower().replace('@', '')
+                if cache_key in self.cached_users:
+                    cached_user = self.cached_users[cache_key]
+                    cached_found.append(cached_user)
+                    logger.info(f"Пользователь @{username} найден в кэше: {cached_user.get('user_id')}")
+                else:
+                    new_usernames.append(username)
+            
+            if not new_usernames:
+                logger.info(f"Все {len(cached_found)} пользователей уже были проверены ранее")
+                # Добавляем найденных из кэша пользователей в общий список
+                for user_data in cached_found:
+                    self.found_users[user_data['username'].lower().replace('@', '')] = user_data
+                return cached_found
+                
+            logger.info(f"Загружено {len(new_usernames)} новых юзернеймов для проверки")
+            
+            # Создаём tqdm прогресс-бар для отслеживания прогресса
+            for username in tqdm(new_usernames, desc="Проверка юзернеймов", unit="user"):
                 # Получаем информацию о пользователе
                 user = await self.get_user_by_username(username)
                 if user:
@@ -197,11 +245,22 @@ class ContactChecker:
                     }
                     found_users.append(user_data)
                     
+                    # Добавляем в общий словарь найденных пользователей
+                    cache_key = username.lower().replace('@', '')
+                    self.found_users[cache_key] = user_data
+                    
                 # Небольшая задержка, чтобы не перегружать API
                 await asyncio.sleep(1)
             
-            logger.info(f"Найдено {len(found_users)} пользователей из {len(df)}")
-            return found_users
+            # Объединяем результаты с кэшем
+            all_found = found_users + cached_found
+            logger.info(f"Найдено {len(found_users)} новых пользователей из {len(new_usernames)}")
+            logger.info(f"Всего найдено {len(all_found)} пользователей (включая кэшированных)")
+            
+            # Сохраняем обновленный кэш
+            self._save_cache()
+            
+            return all_found
             
         except Exception as e:
             logger.error(f"Ошибка при обработке файла с юзернеймами: {e}")
