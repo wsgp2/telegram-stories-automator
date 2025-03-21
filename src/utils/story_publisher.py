@@ -191,7 +191,7 @@ class StoryPublisher:
                             rotation=0.0
                         ),
                         channel=await self.client.get_input_entity(input_user),
-                        message_id=0  # 0 означает тег пользователя без конкретного сообщения
+                        msg_id=0  # 0 означает тег пользователя без конкретного сообщения
                     ))
                     
                     # Также добавляем упоминание в текст подписи
