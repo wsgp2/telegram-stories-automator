@@ -222,7 +222,7 @@ class StoryPublisher:
             try:
                 # Подготавливаем медиа и другие данные для запроса
                 request_data = {
-                    'peer': 'me',  # Публикуем от своего имени
+                    'peer': types.InputPeerSelf(),  # Используем InputPeerSelf() вместо 'me'
                     'media': media,
                     'privacy_rules': privacy_rules,
                     'period': 86400  # 24 часа в секундах
@@ -233,8 +233,9 @@ class StoryPublisher:
                     request_data['caption'] = caption
                 if entities:
                     request_data['entities'] = entities
-                if media_areas:
-                    request_data['media_areas'] = media_areas
+                # ВРЕМЕННО ОТКЛЮЧАЕМ ТЕГИ НА ИЗОБРАЖЕНИИ ДЛЯ ПРОВЕРКИ РАБОТОСПОСОБНОСТИ
+                # if media_areas:
+                #     request_data['media_areas'] = media_areas
                 
                 result = await self.client(functions.stories.SendStoryRequest(**request_data))
                 
@@ -259,7 +260,7 @@ class StoryPublisher:
                         try:
                             # Подготавливаем медиа и другие данные для запроса
                             request_data = {
-                                'peer': 'me',  # Публикуем от своего имени
+                                'peer': types.InputPeerSelf(),  # Используем InputPeerSelf() вместо 'me'
                                 'media': media,
                                 'privacy_rules': privacy_rules,
                                 'period': period
@@ -270,8 +271,9 @@ class StoryPublisher:
                                 request_data['caption'] = caption
                             if entities:
                                 request_data['entities'] = entities
-                            if media_areas:
-                                request_data['media_areas'] = media_areas
+                            # ВРЕМЕННО ОТКЛЮЧАЕМ ТЕГИ НА ИЗОБРАЖЕНИИ ДЛЯ ПРОВЕРКИ РАБОТОСПОСОБНОСТИ
+                            # if media_areas:
+                            #     request_data['media_areas'] = media_areas
                             
                             result = await self.client(functions.stories.SendStoryRequest(**request_data))
                             
