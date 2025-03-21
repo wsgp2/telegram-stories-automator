@@ -182,17 +182,21 @@ class StoryPublisher:
                         break
                     
                     # Создаем медиа-область для тега пользователя
-                    media_areas.append(types.InputMediaAreaChannelPost(
-                        coordinates=types.MediaAreaCoordinates(
-                            x=start_x,
-                            y=current_y,
-                            w=tag_width,
-                            h=tag_height,
-                            rotation=0.0
-                        ),
-                        channel=await self.client.get_input_entity(input_user),
-                        msg_id=0  # 0 означает тег пользователя без конкретного сообщения
-                    ))
+                    try:
+                        input_entity = await self.client.get_input_entity(input_user)
+                        media_areas.append(types.InputMediaAreaChannelPost(
+                            coordinates=types.MediaAreaCoordinates(
+                                x=start_x,
+                                y=current_y,
+                                w=tag_width,
+                                h=tag_height,
+                                rotation=0.0
+                            ),
+                            channel=input_entity,
+                            msg_id=0  # 0 означает тег пользователя без конкретного сообщения
+                        ))
+                    except Exception as e:
+                        logger.error(f"Ошибка при создании медиа-области для {user_data['username']}: {e}")
                     
                     # Также добавляем упоминание в текст подписи
                     mention_text = f"@{user_data['username']} "
@@ -216,15 +220,23 @@ class StoryPublisher:
             # Публикуем сторис с помощью метода stories.SendStoryRequest
             # Telegram ожидает значение period в секундах (86400 = 24 часа)
             try:
-                result = await self.client(functions.stories.SendStoryRequest(
-                    peer=types.InputPeerSelf(),  # Публикуем от своего имени
-                    media=media,
-                    privacy_rules=privacy_rules,
-                    caption=caption,
-                    entities=entities,
-                    media_areas=media_areas,
-                    period=86400  # 24 часа в секундах
-                ))
+                # Подготавливаем медиа и другие данные для запроса
+                request_data = {
+                    'peer': 'me',  # Публикуем от своего имени
+                    'media': media,
+                    'privacy_rules': privacy_rules,
+                    'period': 86400  # 24 часа в секундах
+                }
+                
+                # Добавляем опциональные параметры только если они не пустые
+                if caption:
+                    request_data['caption'] = caption
+                if entities:
+                    request_data['entities'] = entities
+                if media_areas:
+                    request_data['media_areas'] = media_areas
+                
+                result = await self.client(functions.stories.SendStoryRequest(**request_data))
                 
                 logger.info(f"Сторис опубликована успешно")
                 if caption:
@@ -245,15 +257,23 @@ class StoryPublisher:
                     
                     for period in periods:
                         try:
-                            result = await self.client(functions.stories.SendStoryRequest(
-                                peer=types.InputPeerSelf(),
-                                media=media,
-                                privacy_rules=privacy_rules,
-                                caption=caption,
-                                entities=entities,
-                                media_areas=media_areas,
-                                period=period
-                            ))
+                            # Подготавливаем медиа и другие данные для запроса
+                            request_data = {
+                                'peer': 'me',  # Публикуем от своего имени
+                                'media': media,
+                                'privacy_rules': privacy_rules,
+                                'period': period
+                            }
+                            
+                            # Добавляем опциональные параметры только если они не пустые
+                            if caption:
+                                request_data['caption'] = caption
+                            if entities:
+                                request_data['entities'] = entities
+                            if media_areas:
+                                request_data['media_areas'] = media_areas
+                            
+                            result = await self.client(functions.stories.SendStoryRequest(**request_data))
                             
                             logger.info(f"Сторис опубликована успешно с периодом {period} секунд")
                             if caption:
