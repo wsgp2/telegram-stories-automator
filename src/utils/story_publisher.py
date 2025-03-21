@@ -145,24 +145,60 @@ class StoryPublisher:
                 logger.error(f"Неподдерживаемый формат файла: {story_file}")
                 return False
                 
-            # Формируем подпись и упоминания
+            # Базовый текст подписи
             caption = "Тестирую авто упоминание в сторис! Если интересно то напиши свой ник телеграм в коментарий под постом https://t.me/c/2229955923/339 "
             entities = []
+            media_areas = []
+            
+            # Добавляем упоминания пользователей - как теги на медиа и в подпись
             offset = len(caption)
             
-            # Добавляем упоминания пользователей в подпись
+            # Расчет позиций для тегов на медиа с учетом размера изображения
+            # Размещаем теги по вертикали (в колонку)
+            tag_width = 0.3  # 30% от ширины экрана
+            tag_height = 0.05  # 5% от высоты экрана
+            spacing = 0.01  # Промежуток между тегами (1% от высоты)
+            start_x = 0.05  # Начальная позиция по X (5% от левого края)
+            start_y = 0.15  # Начальная позиция по Y (15% от верха)
+            
             for i, user_data in enumerate(users_to_mention):
-                # Получаем объект InputUser для пользователя
                 try:
+                    # Ограничиваем количество упоминаний
+                    if i >= MAX_MENTIONS_PER_STORY:
+                        logger.warning(f"Превышено максимальное количество упоминаний ({MAX_MENTIONS_PER_STORY})")
+                        break
+                        
+                    # Получаем объект пользователя
                     input_user = await self._get_user_by_id(user_data['user_id'])
                     if not input_user:
                         continue
-                        
-                    # Добавляем упоминание в подпись
+                    
+                    # Расчет координат для текущего тега (позицию Y увеличиваем для каждого тега)
+                    current_y = start_y + (i * (tag_height + spacing))
+                    
+                    # Если тег выходит за пределы допустимой области
+                    if current_y + tag_height > 0.9:  # Не размещаем ниже 90% высоты
+                        logger.warning(f"Не удалось разместить все упоминания на сторис - не хватает места")
+                        break
+                    
+                    # Создаем медиа-область для тега пользователя
+                    media_areas.append(types.InputMediaAreaChannelPost(
+                        coordinates=types.MediaAreaCoordinates(
+                            x=start_x,
+                            y=current_y,
+                            w=tag_width,
+                            h=tag_height,
+                            rotation=0.0
+                        ),
+                        channel=await self.client.get_input_entity(input_user),
+                        message_id=0  # 0 означает тег пользователя без конкретного сообщения
+                    ))
+                    
+                    # Также добавляем упоминание в текст подписи
                     mention_text = f"@{user_data['username']} "
                     caption += mention_text
                     
-                    # Создаем entity для упоминания
+                    # Создаем entity для упоминания в подписи
                     entities.append(types.MessageEntityMention(
                         offset=offset,
                         length=len(mention_text.strip())
@@ -186,6 +222,7 @@ class StoryPublisher:
                     privacy_rules=privacy_rules,
                     caption=caption,
                     entities=entities,
+                    media_areas=media_areas,
                     period=86400  # 24 часа в секундах
                 ))
                 
@@ -214,6 +251,7 @@ class StoryPublisher:
                                 privacy_rules=privacy_rules,
                                 caption=caption,
                                 entities=entities,
+                                media_areas=media_areas,
                                 period=period
                             ))
                             
@@ -235,7 +273,7 @@ class StoryPublisher:
                 
                 # Логируем неудачную публикацию
                 await self._log_publication(story_file, users_to_mention, success=False, 
-                                            error=f"Не удалось опубликовать сторис: {e}")
+                                           error=f"Не удалось опубликовать сторис: {e}")
                 
                 return False
                 
@@ -244,7 +282,7 @@ class StoryPublisher:
             
             # Логируем неудачную публикацию
             await self._log_publication(story_file, users_to_mention, success=False, 
-                                        error=f"Непредвиденная ошибка: {e}")
+                                       error=f"Непредвиденная ошибка: {e}")
             
             return False
     
