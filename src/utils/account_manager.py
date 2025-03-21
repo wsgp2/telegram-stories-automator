@@ -1,6 +1,6 @@
 import json
 import logging
-from telethon import TelegramClient
+from telethon import TelegramClient, errors
 from telethon.sessions import StringSession
 import asyncio
 import os
@@ -38,16 +38,25 @@ class AccountManager:
                 
                 # Настройка прокси, если указан
                 proxy = None
-                if 'proxy' in account and all(account['proxy'].values()):
+                if 'proxy' in account:
                     proxy_data = account['proxy']
+                    proxy_type = proxy_data.get('type', 'socks5')  # По умолчанию используем socks5
+                    
+                    # Создаем конфигурацию прокси
                     proxy = {
-                        'proxy_type': 'socks5',  # Можно изменить на http/https при необходимости
+                        'proxy_type': proxy_type,
                         'addr': proxy_data['server'],
                         'port': int(proxy_data['port']),
-                        'username': proxy_data['username'],
-                        'password': proxy_data['password'],
                         'rdns': True
                     }
+                    
+                    # Добавляем аутентификацию, если предоставлена
+                    if 'username' in proxy_data and 'password' in proxy_data:
+                        proxy['username'] = proxy_data['username']
+                        proxy['password'] = proxy_data['password']
+                    
+                    # Логируем настройки прокси для отладки
+                    logger.info(f"Настройки прокси: {proxy_type} {proxy_data['server']}:{proxy_data['port']}")
                 
                 # Создание клиента
                 client = TelegramClient(
@@ -66,14 +75,23 @@ class AccountManager:
                     await client.send_code_request(account['phone'])
                     
                     # Здесь должен быть запрос кода у пользователя
-                    verification_code = input(f"Введите код подтверждения для аккаунта {account['phone']}: ")
+                    code = input(f"Введите код подтверждения для аккаунта {account['phone']}: ")
                     
                     try:
-                        await client.sign_in(account['phone'], verification_code)
-                        logger.info(f"Аккаунт {i+1} успешно авторизован")
+                        await client.sign_in(account['phone'], code)
+                    except errors.SessionPasswordNeededError:
+                        # Если включена двухфакторная аутентификация
+                        if 'two_fa_password' in account and account['two_fa_password']:
+                            password = account['two_fa_password']
+                            logger.info(f"Используем сохраненный пароль 2FA для аккаунта {account['phone']}")
+                        else:
+                            password = input(f"Введите пароль двухфакторной аутентификации для аккаунта {account['phone']}: ")
+                        await client.sign_in(password=password)
                     except Exception as auth_error:
                         logger.error(f"Ошибка авторизации аккаунта {i+1}: {auth_error}")
                         continue
+                    
+                    logger.info(f"Аккаунт {i+1} успешно авторизован")
                 
                 # Добавление клиента в список
                 self.clients.append({

@@ -1,6 +1,7 @@
 import logging
 import csv
 import pandas as pd
+import os
 from telethon.tl.functions.contacts import ImportContactsRequest
 from telethon.tl.types import InputPhoneContact
 import asyncio
@@ -12,8 +13,13 @@ logger = logging.getLogger(__name__)
 class ContactChecker:
     """Класс для проверки наличия контактов в Telegram"""
     
-    def __init__(self, client):
-        self.client = client
+    def __init__(self, client_data):
+        # Если передан словарь с клиентом, извлекаем объект клиента
+        if isinstance(client_data, dict) and 'client' in client_data:
+            self.client = client_data['client']
+        else:
+            # Иначе предполагаем, что передан сам объект клиента
+            self.client = client_data
         self.found_users = {}
     
     async def check_phone_number(self, phone_number):
@@ -119,13 +125,30 @@ class ContactChecker:
             Entity или None: Сущность пользователя или None, если пользователь не найден
         """
         try:
-            # Добавляем @ если его нет в начале
-            if not username.startswith('@'):
-                username = '@' + username
+            # Проверяем, что клиент корректный
+            if not self.client:
+                logger.error(f"Отсутствует клиент для поиска пользователя {username}")
+                return None
                 
-            entity = await self.client.get_entity(username)
-            logger.info(f"Найден пользователь {username}: {entity.id}")
-            return entity
+            # Удаляем @ если он есть в начале, чтобы избежать двойного @
+            if username.startswith('@'):
+                username = username[1:]
+                
+            # Используем get_entity для поиска пользователя по юзернейму
+            try:
+                entity = await self.client.get_entity(username)
+                logger.info(f"Найден пользователь @{username}: {entity.id}")
+                return entity
+            except ValueError:
+                # Пробуем поискать с @
+                try:
+                    entity = await self.client.get_entity(f"@{username}")
+                    logger.info(f"Найден пользователь @{username}: {entity.id}")
+                    return entity
+                except Exception as e:
+                    logger.error(f"Пользователь @{username} не найден: {e}")
+                    return None
+                
         except Exception as e:
             logger.error(f"Ошибка при поиске пользователя {username}: {e}")
             return None
@@ -145,49 +168,41 @@ class ContactChecker:
             return []
         
         try:
-            # Чтение юзернеймов из файла
-            usernames = []
-            with open(filepath, 'r', encoding='utf-8') as file:
-                reader = csv.DictReader(file)
-                for row in reader:
-                    if 'username' in row:
-                        usernames.append(row['username'])
-            
-            if not usernames:
-                logger.warning(f"В файле {filepath} не найдены юзернеймы")
-                return []
-            
-            logger.info(f"Загружено {len(usernames)} юзернеймов для проверки")
-            
-            # Проверка юзернеймов и получение пользователей
             found_users = []
-            for username in tqdm(usernames, desc="Проверка юзернеймов", unit="user"):
-                entity = await self.get_user_by_username(username)
-                if entity:
-                    found_users.append({
-                        'user_id': entity.id,
+            
+            # Загружаем юзернеймы из CSV файла
+            df = pd.read_csv(filepath)
+            if 'username' not in df.columns:
+                logger.error(f"В файле {filepath} отсутствует колонка 'username'")
+                return []
+                
+            logger.info(f"Загружено {len(df)} юзернеймов для проверки")
+            
+            # Создаём tqdm прогресс-бар для отслеживания прогресса
+            from tqdm import tqdm
+            for _, row in tqdm(df.iterrows(), total=len(df), desc="Проверка юзернеймов"):
+                username = row['username'].strip()
+                if not username:
+                    continue
+                    
+                # Получаем информацию о пользователе
+                user = await self.get_user_by_username(username)
+                if user:
+                    # Сохраняем найденного пользователя
+                    user_data = {
+                        'user_id': user.id,
                         'username': username,
-                        'first_name': getattr(entity, 'first_name', ''),
-                        'last_name': getattr(entity, 'last_name', '')
-                    })
+                        'first_name': getattr(user, 'first_name', ''),
+                        'last_name': getattr(user, 'last_name', '')
+                    }
+                    found_users.append(user_data)
+                    
                 # Небольшая задержка, чтобы не перегружать API
                 await asyncio.sleep(1)
             
-            logger.info(f"Найдено {len(found_users)} пользователей из {len(usernames)}")
-            
-            # Сохраняем результаты в CSV
-            if found_users:
-                output_dir = os.path.join(os.path.dirname(filepath), 'results')
-                os.makedirs(output_dir, exist_ok=True)
-                
-                output_file = os.path.join(output_dir, 'found_users.csv')
-                df = pd.DataFrame(found_users)
-                df.to_csv(output_file, index=False, encoding='utf-8')
-                
-                logger.info(f"Результаты сохранены в {output_file}")
-            
+            logger.info(f"Найдено {len(found_users)} пользователей из {len(df)}")
             return found_users
             
         except Exception as e:
-            logger.error(f"Ошибка при проверке юзернеймов из файла {filepath}: {e}")
+            logger.error(f"Ошибка при обработке файла с юзернеймами: {e}")
             return []

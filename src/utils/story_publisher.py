@@ -2,7 +2,7 @@ import logging
 import os
 import random
 import asyncio
-from telethon.tl.types import InputMediaUploadedPhoto, InputMediaUploadedVideo, InputUser
+from telethon.tl.types import InputUser
 from telethon.tl.functions.contacts import ResolveUsernameRequest
 from telethon import functions, types
 import time
@@ -15,8 +15,13 @@ logger = logging.getLogger(__name__)
 class StoryPublisher:
     """Класс для публикации сторис с упоминаниями пользователей"""
     
-    def __init__(self, client):
-        self.client = client
+    def __init__(self, client_data):
+        # Если передан словарь с клиентом, извлекаем объект клиента
+        if isinstance(client_data, dict) and 'client' in client_data:
+            self.client = client_data['client']
+        else:
+            # Иначе предполагаем, что передан сам объект клиента
+            self.client = client_data
     
     def _get_random_story_file(self):
         """Получение случайного файла сторис из директории"""

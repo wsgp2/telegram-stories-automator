@@ -20,10 +20,10 @@ from pathlib import Path
 # Добавляем корневую директорию проекта в PATH
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.utils.account_manager import AccountManager
-from src.utils.contact_checker import ContactChecker
-from src.utils.story_publisher import StoryPublisher
-from configs.settings import CONTACTS_DIR, STORIES_DIR, RESULTS_DIR, PROJECT_DIR, DELAY_BETWEEN_STORIES
+from utils.account_manager import AccountManager
+from utils.contact_checker import ContactChecker
+from utils.story_publisher import StoryPublisher
+from configs.settings import CONTACTS_DIR, STORIES_DIR, RESULTS_DIR, BASE_DIR, DELAY_BETWEEN_STORIES
 
 # Настройка логирования
 logging.basicConfig(
@@ -31,7 +31,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler(os.path.join(PROJECT_DIR, 'telegram_stories.log'))
+        logging.FileHandler(os.path.join(BASE_DIR, 'telegram_stories.log'))
     ]
 )
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ async def main():
         
         # Получаем список аккаунтов
         account_manager = AccountManager()
-        clients = await account_manager.load_accounts()
+        clients = await account_manager.setup_clients()
         
         if not clients:
             logger.error("Не удалось загрузить ни одного аккаунта")
@@ -66,8 +66,9 @@ async def main():
             contacts_file = input(f"Введите путь к файлу с номерами (или нажмите Enter для 'contacts_example.csv'): ")
             if not contacts_file:
                 contacts_file = os.path.join(CONTACTS_DIR, 'contacts_example.csv')
-            
-            contacts_file = os.path.join(CONTACTS_DIR, contacts_file) if not os.path.isabs(contacts_file) else contacts_file
+            elif not os.path.isabs(contacts_file) and not contacts_file.startswith(CONTACTS_DIR):
+                # Если путь не абсолютный и не начинается с CONTACTS_DIR, добавляем CONTACTS_DIR
+                contacts_file = os.path.join(CONTACTS_DIR, contacts_file)
             
             logger.info(f"Проверка контактов из файла {contacts_file}")
             
@@ -86,8 +87,9 @@ async def main():
             usernames_file = input(f"Введите путь к файлу с юзернеймами (или нажмите Enter для 'contacts_test.csv'): ")
             if not usernames_file:
                 usernames_file = os.path.join(CONTACTS_DIR, 'contacts_test.csv')
-            
-            usernames_file = os.path.join(CONTACTS_DIR, usernames_file) if not os.path.isabs(usernames_file) else usernames_file
+            elif not os.path.isabs(usernames_file) and not usernames_file.startswith(CONTACTS_DIR):
+                # Если путь не абсолютный и не начинается с CONTACTS_DIR, добавляем CONTACTS_DIR
+                usernames_file = os.path.join(CONTACTS_DIR, usernames_file)
             
             logger.info(f"Проверка юзернеймов из файла {usernames_file}")
             
@@ -169,8 +171,10 @@ async def main():
         logger.error(f"Ошибка при выполнении программы: {e}")
     finally:
         # Закрываем все клиенты
-        for client in clients:
-            await client.disconnect()
+        try:
+            await account_manager.close_all_clients()
+        except Exception as e:
+            logger.error(f"Ошибка при закрытии клиентов: {e}")
         logger.info("Программа завершена")
 
 if __name__ == "__main__":
