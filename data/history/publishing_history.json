@@ -14,5 +14,108 @@
       "misterfantastic"
     ],
     "success": true
+  },
+  {
+    "date": "2025-03-21 14:32:04",
+    "story_file": "photo_2025-03-21 12.43.01.jpeg",
+    "users_mentioned": [
+      "ipoteka_cik",
+      "fils_lab",
+      "blinkov_dm",
+      "aburushin",
+      "babkov9",
+      "arondkrn",
+      "viacheslav_andrianov",
+      "sergelise",
+      "psysobolev",
+      "misterfantastic"
+    ],
+    "success": true
+  },
+  {
+    "date": "2025-03-21 15:17:50",
+    "story_file": "photo_2025-03-21 12.43.01.jpeg",
+    "users_mentioned": [
+      "fils_lab",
+      "blinkov_dm",
+      "aburushin",
+      "babkov9",
+      "arondkrn",
+      "viacheslav_andrianov",
+      "sergelise",
+      "psysobolev",
+      "misterfantastic",
+      "ipoteka_cik"
+    ],
+    "success": false,
+    "error": "Не удалось опубликовать сторис: Invalid channel object. Make sure to pass the right types, for instance making sure that the request is designed for channels or otherwise look for a different one more suited (caused by SendStoryRequest)"
+  },
+  {
+    "date": "2025-03-21 15:20:10",
+    "story_file": "photo_2025-03-21 12.43.01.jpeg",
+    "users_mentioned": [
+      "fils_lab",
+      "blinkov_dm",
+      "aburushin",
+      "babkov9",
+      "arondkrn",
+      "viacheslav_andrianov",
+      "sergelise",
+      "psysobolev",
+      "misterfantastic",
+      "ipoteka_cik"
+    ],
+    "success": false,
+    "error": "Не удалось опубликовать сторис: Invalid channel object. Make sure to pass the right types, for instance making sure that the request is designed for channels or otherwise look for a different one more suited (caused by SendStoryRequest)"
+  },
+  {
+    "date": "2025-03-21 15:21:38",
+    "story_file": "photo_2025-03-21 12.43.01.jpeg",
+    "users_mentioned": [
+      "fils_lab",
+      "blinkov_dm",
+      "aburushin",
+      "babkov9",
+      "arondkrn",
+      "viacheslav_andrianov",
+      "sergelise",
+      "psysobolev",
+      "misterfantastic",
+      "ipoteka_cik"
+    ],
+    "success": true
+  },
+  {
+    "date": "2025-03-23 00:38:25",
+    "story_file": "photo_2025-03-21 12.43.01.jpeg",
+    "users_mentioned": [
+      "izobilioner",
+      "ipoteka_cik",
+      "fils_lab",
+      "blinkov_dm",
+      "aburushin",
+      "babkov9"
+    ],
+    "success": true
+  },
+  {
+    "date": "2025-03-23 00:40:17",
+    "story_file": "photo_2025-03-21 12.43.01.jpeg",
+    "users_mentioned": [
+      "arondkrn",
+      "sergelise",
+      "psysobolev",
+      "misterfantastic"
+    ],
+    "success": true
+  },
+  {
+    "date": "2025-03-23 00:53:31",
+    "story_file": "photo_2025-03-21 12.43.01.jpeg",
+    "users_mentioned": [
+      "ilmir62",
+      "izobilioner"
+    ],
+    "success": true
   }
 ]
